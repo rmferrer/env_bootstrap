@@ -13,7 +13,7 @@ _uname() {
 _pkg_install() {
 	UNAME=$(_uname)
 	if [[ $UNAME =~ "darwin" || $UNAME =~ "ubuntu" ]]; then
-		brew install "${@}" && brew upgrade "${@}"
+		brew install "${@}" || brew upgrade "${@}"
 	elif [[ $UNAME =~  "raspberrypi" ]]; then
 		sudo apt-get -y install "${@}"
 	fi	
