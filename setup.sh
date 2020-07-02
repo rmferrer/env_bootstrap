@@ -136,10 +136,6 @@ _manage_dotfiles() {
 
 	read KEY_ID
 
-	printf "Enter Key File: "
-
-	read KEY_FILE
-
 	printf "Enter dotfiles repo uri: "
 	
 	read DOTFILES_URI
