@@ -145,6 +145,7 @@ _manage_dotfiles() {
 	read DOTFILES_URI
 
 	ssh-agent bash -c "
+		ssh-add -D
 		ssh-add - <<< \"$(op get document ${KEY_ID})\" 
 		chezmoi init "${DOTFILES_URI}" --apply;
 		op signout;
