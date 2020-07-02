@@ -151,7 +151,7 @@ _manage_dotfiles() {
 }
 
 _main() {
-	_install_package_manager
+	_run_or_exit _install_package_manager
 
 	_install_test_packages
 
