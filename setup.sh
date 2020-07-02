@@ -41,8 +41,8 @@ _install_package_manager() {
 		printf "Setting up macOS...\n\n"
 		_install_brew
 		brew update
-	elif [[ ${UNAME} =~ "ubuntu" ]]; then
-		printf "Setting up ubuntu...\n\n"
+	elif [[ ${UNAME} =~ "ubuntu" || ${UNAME} =~ "debian" ]]; then
+		printf "Setting up ubuntu or debian...\n\n"
 		sudo apt-get -y install build-essential curl file git
 		_install_brew
 		eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
