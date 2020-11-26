@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SETUP_URL="https://bit.ly/rmferrer_env_bootstrap"; /bin/bash -c "$(curl -fsSL ${SETUP_URL} || wget ${SETUP_URL} -O - )";
+# SETUP_URL="https://bit.ly/rmferrer_env_bootstrap" && /bin/bash -c "$(curl -fsSL ${SETUP_URL} || wget ${SETUP_URL} -O - )";
 
 _install_brew() {
 	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"	
