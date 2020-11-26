@@ -2,15 +2,15 @@
 
 # SETUP_URL="https://bit.ly/rmferrer_env_bootstrap" && /bin/bash -c "$(curl -fsSL ${SETUP_URL} || wget ${SETUP_URL} -O - )";
 
-_install_brew() {
+function _install_brew() {
 	/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"	
 }
 
-_uname() {
+function _uname() {
 	echo "$(uname -a | tr '[:upper:]' '[:lower:]')"
 }
 
-_pkg_install() {
+function _pkg_install() {
 	UNAME=$(_uname)
 	if [[ $UNAME =~ "darwin" || $UNAME =~ "ubuntu" ]]; then
 		brew install "${@}" || brew upgrade "${@}"
@@ -19,7 +19,7 @@ _pkg_install() {
 	fi	
 }
 
-_run_or_exit() {
+function _run_or_exit() {
 	local local_cmd="${@}"
 	eval "${local_cmd}" 
 	local local_status="${?}"
@@ -31,7 +31,7 @@ _run_or_exit() {
 	fi
 }
 
-_install_package_manager() {
+function _install_package_manager() {
 	UNAME=$(_uname)
 
 	printf "Attempting to install package manager...\n\n"
@@ -56,11 +56,11 @@ _install_package_manager() {
 	fi
 }
 
-_install_test_packages() {
+function _install_test_packages() {
 	_run_or_exit _pkg_install hello
 }
 
-_install_base_packages() {
+function _install_base_packages() {
 	_run_or_exit _pkg_install git zsh
 	UNAME=$(_uname)
 	if [[ ${UNAME} =~ "darwin" ]]; then
@@ -74,12 +74,12 @@ _install_base_packages() {
 	_run_or_exit op help > /dev/null
 }
 
-_1p_logged_in() {
+function _1p_logged_in() {
 	op list templates > /dev/null 2>&1
 }
 
 
-_1p_login() {
+function _1p_login() {
 	readonly max_retries=3
 	[[ -f ${HOME}/.op/config ]] && rm ${HOME}/.op/config
 
@@ -103,7 +103,7 @@ _1p_login() {
 	_1p_logged_in
 }
 
-_install_chezmoi() {
+function _install_chezmoi() {
 	UNAME=$(_uname)
 	if [[ ${UNAME} =~ "darwin" || ${UNAME} =~ "ubuntu" ]]; then
 		_pkg_install chezmoi
@@ -113,7 +113,7 @@ _install_chezmoi() {
 	fi	
 }
 
-_manage_dotfiles() {
+function _manage_dotfiles() {
 	CHEZMOI_DIR="${HOME}/.local/share/chezmoi"
 
 	if [[ -d "${CHEZMOI_DIR}" ]]; then
@@ -150,7 +150,7 @@ _manage_dotfiles() {
 	${SHELL}
 }
 
-_main() {
+function _main() {
 	_run_or_exit _install_package_manager
 
 	_install_test_packages
