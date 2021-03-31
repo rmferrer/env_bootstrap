@@ -64,7 +64,7 @@ function _install_base_packages() {
 	_run_or_exit _pkg_install git zsh
 	UNAME=$(_uname)
 	if [[ ${UNAME} =~ "darwin" ]]; then
-		_run_or_exit brew cask install 1password-cli
+		_run_or_exit brew install --cask 1password-cli
 	else
 		printf "Please install one password and then type any key.\n\n"
 		printf "https://app-updates.agilebits.com/product_history/CLI\n\n\n"
