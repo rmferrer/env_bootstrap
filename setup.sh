@@ -114,11 +114,21 @@ case "$OS" in
       exit 1
     fi
 
-    info "Checking SSH agent socket..."
-    if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+    info "Pointing SSH_AUTH_SOCK at 1Password's agent socket..."
+    export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    if [[ -S "$SSH_AUTH_SOCK" ]]; then
       ok "SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
     else
-      info "(SSH_AUTH_SOCK not set in this shell — that's fine; ~/.zshrc will set it after dotfiles apply)"
+      err "1Password SSH agent socket not found at $SSH_AUTH_SOCK"
+      err "Confirm 'Use the SSH agent' is enabled in 1Password Settings → Developer."
+      exit 1
+    fi
+    if ssh-add -l &>/dev/null; then
+      ok "SSH agent has keys:"
+      ssh-add -l | sed 's/^/        /'
+    else
+      err "SSH agent has no identities. Sign into a 1Password account that contains SSH keys."
+      exit 1
     fi
     ;;
 
@@ -163,15 +173,18 @@ case "$OS" in
     ;;
 esac
 
-# ── Step 4: Clone private repo ────────────────────────────────────────────────
-log "[4/4] Clone private environment repo"
-if [[ -d "$TARGET" ]]; then
-  skip "Target directory already exists: $TARGET"
-  if [[ -d "$TARGET/.git" ]]; then
-    info "Existing repo remote:"
-    git -C "$TARGET" remote -v 2>&1 | sed 's/^/        /'
-    info "Existing repo HEAD: $(git -C "$TARGET" log -1 --oneline 2>&1)"
-  fi
+# ── Step 4: Clone private repo (and pull latest if it already exists) ────────
+log "[4/4] Clone or update private environment repo"
+if [[ -d "$TARGET/.git" ]]; then
+  info "Existing repo at $TARGET — pulling latest..."
+  info "Remote:"
+  git -C "$TARGET" remote -v 2>&1 | sed 's/^/        /'
+  info "HEAD before: $(git -C "$TARGET" log -1 --oneline 2>&1)"
+  git -C "$TARGET" pull --ff-only
+  ok "HEAD after:  $(git -C "$TARGET" log -1 --oneline)"
+elif [[ -d "$TARGET" ]]; then
+  err "$TARGET exists but isn't a git repo. Remove it and re-run."
+  exit 1
 else
   info "Cloning $PRIVATE_REPO"
   info "Destination: $TARGET"
@@ -181,5 +194,5 @@ else
 fi
 
 log "Handoff to private bootstrap.sh"
-info "exec $TARGET/bootstrap.sh"
-exec "$TARGET/bootstrap.sh"
+info "Running: bash $TARGET/bootstrap.sh"
+exec bash "$TARGET/bootstrap.sh"
