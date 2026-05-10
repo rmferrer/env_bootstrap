@@ -4,7 +4,9 @@
 # then clones the private environment repo and hands off to its bootstrap.sh.
 #
 # Run via:
-#   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/bootstrap.sh)"
+#   /bin/bash -c "$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)"
+# or:
+#   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/setup.sh)"
 
 set -euo pipefail
 

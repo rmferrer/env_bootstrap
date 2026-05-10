@@ -18,5 +18,11 @@ problem of needing SSH to clone the private [environment](https://github.com/rmf
 ## Run it
 
 ```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/bootstrap.sh)"
+/bin/bash -c "$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)"
+```
+
+Or the full URL:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/setup.sh)"
 ```
