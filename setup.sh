@@ -72,8 +72,15 @@ case "$OS" in
         skip "1Password.app already installed (managed by Homebrew)"
       else
         info "1Password.app exists at /Applications but isn't tracked by Homebrew"
-        info "Adopting existing install into Homebrew..."
+        existing_ver="$(defaults read /Applications/1Password.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null || echo unknown)"
+        cask_ver="$(brew info --cask 1password 2>/dev/null | awk 'NR==1 {print $3}')"
+        cask_ver="${cask_ver:-unknown}"
+        info "On-disk version: $existing_ver  |  Homebrew cask version: $cask_ver"
+        info "Adopting (bookkeeping only — does not touch the on-disk binary)..."
         brew install --cask --adopt 1password
+        if [[ "$existing_ver" != "$cask_ver" && "$existing_ver" != unknown && "$cask_ver" != unknown ]]; then
+          info "Versions differ — 1Password's built-in auto-updater keeps the app current regardless of brew."
+        fi
         ok "1Password.app adopted by Homebrew"
       fi
     else
