@@ -52,13 +52,15 @@ info "Date:         $(date)"
 # ── Preflight: don't run as root ──────────────────────────────────────────────
 if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
   err "Refusing to run as root (EUID=0)."
-  err "Homebrew will not install as root, and dotfiles end up owned by root."
+  err "Homebrew won't install as root, and dotfiles end up owned by root."
   err ""
-  err "Reconnect / log in as a non-root user, then re-run this script."
-  err "If no non-root user exists yet, create one first:"
-  err "  Debian/Ubuntu:  useradd -m -s /bin/bash <name> && passwd <name> && usermod -aG sudo <name>"
-  err "  RHEL/Fedora:    useradd -m -s /bin/bash <name> && passwd <name> && usermod -aG wheel <name>"
-  err "Then:             su - <name>"
+  err "If no non-root user exists on this box yet, run init_user.sh first"
+  err "(it creates a user with sudo + SSH access from root's authorized_keys):"
+  err "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/init_user.sh)\""
+  err ""
+  err "Then disconnect, SSH back in with agent forwarding, and re-run setup.sh:"
+  err "  ssh -A <user>@<host>"
+  err "  /bin/bash -c \"\$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)\""
   exit 1
 fi
 
