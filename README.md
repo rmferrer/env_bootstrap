@@ -22,16 +22,17 @@ its `bootstrap.sh` for chezmoi.
 /bin/bash -c "$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)"
 ```
 
-### Linux: first-time on a fresh box (no non-root user yet)
+That's the only command. The script branches on what it finds:
 
-`setup.sh` refuses to run as root. If you only have root access on a fresh
-Linux server, run `init_user.sh` first (as root) — it creates a non-root user
-with sudo + SSH access (keys copied from `/root/.ssh/authorized_keys`):
-
-```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/init_user.sh)"
-```
-
-Override the default username (`rmferrer`) with `INIT_USER=<name>`. After it
-finishes, disconnect, SSH back in as the new user **with agent forwarding**
-(`ssh -A`), and then run the regular `setup.sh` one-liner above.
+- **macOS, regular user**: installs Homebrew + 1Password app/CLI, pauses for
+  you to enable SSH agent + CLI integration, clones the private repo, runs
+  chezmoi.
+- **Linux, non-root user**: installs Homebrew + 1Password CLI, runs
+  `op account add` / `op signin`, clones via forwarded SSH agent, runs
+  chezmoi.
+- **Linux, root (e.g., fresh server with only root access)**: creates a
+  non-root user (default `rmferrer`, override with `INIT_USER=<name>`) with
+  sudo + SSH access (keys copied from `/root/.ssh/authorized_keys`) and
+  prints the reconnect instructions. After reconnecting as the new user with
+  `ssh -A`, run the same one-liner again — same URL, same script.
+- **macOS, root**: refuses. Log in as your regular account.

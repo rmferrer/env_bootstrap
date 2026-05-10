@@ -49,19 +49,88 @@ info "Home:         $HOME"
 info "Clone target: $TARGET"
 info "Date:         $(date)"
 
-# ── Preflight: don't run as root ──────────────────────────────────────────────
+# ── Preflight: handle running as root ─────────────────────────────────────────
+# On Linux: bootstrap a non-root user and exit (the user has to reconnect with
+#   `ssh -A` to get agent forwarding for the private repo clone).
+# On macOS: just refuse — there's no legitimate reason to bootstrap as root.
+bootstrap_linux_user() {
+  local new_user="${INIT_USER:-rmferrer}"
+
+  log "Running as root on Linux — bootstrapping a non-root user first"
+  info "Target user:  $new_user  (override with INIT_USER=<name>)"
+  info "Hostname:     $(hostname)"
+  info "OS release:   $(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-unknown}")"
+
+  log "[user] Account"
+  if id "$new_user" &>/dev/null; then
+    skip "User '$new_user' already exists (UID $(id -u "$new_user"))"
+  else
+    useradd -m -s /bin/bash "$new_user"
+    ok "Created $new_user (UID $(id -u "$new_user"))"
+  fi
+
+  log "[user] Sudo group"
+  local sudo_group
+  if getent group sudo &>/dev/null; then
+    sudo_group=sudo
+  elif getent group wheel &>/dev/null; then
+    sudo_group=wheel
+  else
+    err "Neither 'sudo' nor 'wheel' group exists. Install sudo first."
+    exit 1
+  fi
+  if id -nG "$new_user" | tr ' ' '\n' | grep -qx "$sudo_group"; then
+    skip "$new_user is already in $sudo_group"
+  else
+    usermod -aG "$sudo_group" "$new_user"
+    ok "Added $new_user to $sudo_group"
+  fi
+
+  log "[user] Passwordless sudo"
+  local sudoers_file="/etc/sudoers.d/90-${new_user}"
+  if [[ -f "$sudoers_file" ]]; then
+    skip "$sudoers_file already exists"
+  else
+    echo "$new_user ALL=(ALL) NOPASSWD:ALL" > "$sudoers_file"
+    chmod 440 "$sudoers_file"
+    ok "Wrote $sudoers_file"
+  fi
+
+  log "[user] SSH authorized_keys"
+  local user_ssh="/home/$new_user/.ssh"
+  local user_keys="$user_ssh/authorized_keys"
+  if [[ -f "$user_keys" ]]; then
+    skip "$user_keys already exists ($(wc -l <"$user_keys") line(s))"
+  elif [[ -f /root/.ssh/authorized_keys ]]; then
+    mkdir -p "$user_ssh"
+    cp /root/.ssh/authorized_keys "$user_keys"
+    chown -R "$new_user:$new_user" "$user_ssh"
+    chmod 700 "$user_ssh"
+    chmod 600 "$user_keys"
+    ok "Copied $(wc -l <"$user_keys") key(s) from /root/.ssh; perms 700/600"
+  else
+    err "/root/.ssh/authorized_keys not found. Add your public key to"
+    err "  $user_keys manually before disconnecting."
+    exit 1
+  fi
+
+  log "User bootstrap complete!"
+  info "Next steps (from your laptop):"
+  info "  1. Disconnect from this root session."
+  info "  2. Reconnect as $new_user WITH agent forwarding so your 1Password"
+  info "     SSH agent on the laptop can authenticate the private repo clone:"
+  info "       ssh -A $new_user@$(hostname)"
+  info "  3. Re-run this script — the non-root flow continues from here:"
+  info "       /bin/bash -c \"\$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)\""
+  exit 0
+}
+
 if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-  err "Refusing to run as root (EUID=0)."
-  err "Homebrew won't install as root, and dotfiles end up owned by root."
-  err ""
-  err "If no non-root user exists on this box yet, run init_user.sh first"
-  err "(it creates a user with sudo + SSH access from root's authorized_keys):"
-  err "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/init_user.sh)\""
-  err ""
-  err "Then disconnect, SSH back in with agent forwarding, and re-run setup.sh:"
-  err "  ssh -A <user>@<host>"
-  err "  /bin/bash -c \"\$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)\""
-  exit 1
+  case "$OS" in
+    Linux)  bootstrap_linux_user ;;
+    Darwin) err "Refusing to run as root on macOS. Log in as your regular account."; exit 1 ;;
+    *)      err "Refusing to run as root on $OS."; exit 1 ;;
+  esac
 fi
 
 # ── Step 1: Homebrew ──────────────────────────────────────────────────────────
