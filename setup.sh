@@ -67,8 +67,15 @@ info "brew path: $(command -v brew)"
 case "$OS" in
   Darwin)
     log "[2/4] 1Password desktop app"
-    if brew list --cask 1password &>/dev/null; then
-      skip "1Password.app already installed via Homebrew cask"
+    if [[ -d /Applications/1Password.app ]]; then
+      if brew list --cask 1password &>/dev/null; then
+        skip "1Password.app already installed (managed by Homebrew)"
+      else
+        info "1Password.app exists at /Applications but isn't tracked by Homebrew"
+        info "Adopting existing install into Homebrew..."
+        brew install --cask --adopt 1password
+        ok "1Password.app adopted by Homebrew"
+      fi
     else
       info "Installing 1Password desktop app (cask, ~150MB)..."
       brew install --cask 1password
