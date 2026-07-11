@@ -60,7 +60,7 @@ case "$OS" in
 
   # ─── macOS ────────────────────────────────────────────────────────────────
   Darwin)
-    log "[1/4] Homebrew"
+    log "[1/3] Homebrew"
     if command -v brew &>/dev/null; then
       skip "brew already installed at $(command -v brew)"
       info "Version: $(brew --version | head -1)"
@@ -73,7 +73,7 @@ case "$OS" in
     load_brew_env
     info "brew path: $(command -v brew)"
 
-    log "[2/4] 1Password desktop app"
+    log "[2/3] 1Password desktop app"
     if [[ -d /Applications/1Password.app ]]; then
       if brew list --cask 1password &>/dev/null; then
         skip "1Password.app already installed (managed by Homebrew)"
@@ -96,7 +96,7 @@ case "$OS" in
       ok "1Password.app installed"
     fi
 
-    log "[3/4] 1Password CLI"
+    log "[3/3] 1Password CLI"
     if command -v op &>/dev/null; then
       skip "op already installed at $(command -v op)"
       info "Version: $(op --version)"
@@ -147,43 +147,19 @@ case "$OS" in
       exit 1
     fi
 
-    log "[1/4] Distro packages (git, curl, gnupg, ca-certificates)"
+    log "[1/2] Distro packages (git, curl, ca-certificates)"
     info "Refreshing apt index..."
     $SUDO apt-get update -qq
-    apt_install git curl gnupg ca-certificates
+    apt_install git curl ca-certificates
     ok "Distro packages installed"
 
-    log "[2/4] 1Password CLI (op)"
-    if command -v op &>/dev/null; then
-      skip "op already installed at $(command -v op)"
-      info "Version: $(op --version)"
-    else
-      info "Adding 1Password apt repo and installing 1password-cli..."
-      # Trust the 1Password package signing key
-      curl -fsSL https://downloads.1password.com/linux/keys/1password.asc | \
-        $SUDO gpg --dearmor --yes -o /usr/share/keyrings/1password-archive-keyring.gpg
-      # Add their apt source for our architecture
-      DEB_ARCH="$(dpkg --print-architecture)"
-      echo "deb [arch=$DEB_ARCH signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$DEB_ARCH stable main" | \
-        $SUDO tee /etc/apt/sources.list.d/1password.list >/dev/null
-      $SUDO apt-get update -qq
-      apt_install 1password-cli
-      ok "op installed: $(op --version)"
-    fi
+    # No 1Password on Linux: chezmoi templates don't read any op:// secrets
+    # (public signing keys are inlined in .chezmoidata.toml), and SSH auth +
+    # commit signing both go through the agent forwarded from the laptop
+    # (ssh -A). op CLI standalone sign-in also can't handle accounts with
+    # Duo/security-key MFA, so requiring it here would block work devboxes.
 
-    log "[3/4] 1Password sign-in"
-    if op account list 2>/dev/null | grep -q .; then
-      skip "Already have 1Password accounts configured:"
-      op account list | sed 's/^/        /'
-    else
-      info "No accounts yet — running 'op account add'"
-      info "Have ready: sign-in URL, email, secret key, master password"
-      op account add </dev/tty
-    fi
-    info "Signing in (master password)..."
-    eval "$(op signin </dev/tty)"
-    ok "Signed in"
-
+    log "[2/2] SSH agent check"
     info "Checking SSH agent (should have keys forwarded from your laptop)..."
     if ssh-add -l &>/dev/null; then
       ok "SSH agent has keys:"
@@ -201,7 +177,7 @@ case "$OS" in
 esac
 
 # ── Step 4: Clone private repo (and pull latest if it already exists) ────────
-log "[4/4] Clone or update private environment repo"
+log "Clone or update private environment repo"
 if [[ -d "$TARGET/.git" ]]; then
   info "Existing repo at $TARGET — pulling latest..."
   info "HEAD before: $(git -C "$TARGET" log -1 --oneline 2>&1)"
