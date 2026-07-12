@@ -33,5 +33,7 @@ That's the only command. The script branches on what it finds:
   chezmoi.
 - **Linux, any user (root or not)**: installs distro packages, verifies the
   forwarded SSH agent (`ssh -A` from your laptop), clones the private repo,
-  runs chezmoi. Answer `true` to "Is this a work machine?" on devboxes.
+  runs chezmoi. chezmoi asks two independent profile questions — "Enable the
+  work profile?" and "Enable the personal profile?" — answer `true`/`false`
+  per machine (devboxes: work `true`, personal `false`).
 - **macOS, root**: refuses. Log in as your regular account.
