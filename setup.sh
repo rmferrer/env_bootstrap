@@ -2,26 +2,54 @@
 # Public bootstrap. Handles all interactive auth setup, then clones the
 # private environment repo and hands off to its bootstrap.sh for chezmoi.
 #
-# macOS uses Homebrew. Linux uses distro package managers + official curl
-# installers — works fine as root or non-root, no user-creation dance.
+# macOS uses Homebrew. Linux uses distro package managers and works as root or
+# non-root, with no user-creation dance.
 #
-# Run via:
-#   /bin/bash -c "$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)"
-# or:
-#   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/setup.sh)"
+# Download and verify this file before running it. README.md contains the
+# current URL and SHA-256 digest.
 
 set -euo pipefail
 
 PRIVATE_REPO="git@github.com:rmferrer/environment.git"
+PRIVATE_REPO_HTTPS="https://github.com/rmferrer/environment.git"
 TARGET="$HOME/code/env"
 OS="$(uname -s)"
 ARCH="$(uname -m)"
+CURRENT_USER="${USER:-$(id -un)}"
+
+# Reviewed upstream installer entrypoint. The digest prevents execution if the
+# immutable GitHub object does not match the version reviewed in this repo.
+HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/39a0c068274254a7658fd9761d59bce9d0e2151f/install.sh"
+HOMEBREW_INSTALL_SHA256="8ff338091a5e10bb5fc040b38316648110f42feff057ecf9feaab51fd0a13ef9"
 
 log()  { printf '\n==> %s\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
 ok()   { printf '    [OK]   %s\n' "$*"; }
 skip() { printf '    [skip] %s\n' "$*"; }
 err()  { printf '\nERROR: %s\n' "$*" >&2; }
+
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
+
+download_verified() {
+  local url="$1" expected="$2" destination="$3" actual
+  curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+    --output "$destination" "$url"
+  actual="$(sha256_file "$destination")"
+  if [[ "$actual" != "$expected" ]]; then
+    rm -f "$destination"
+    err "Checksum mismatch for $url"
+    err "Expected: $expected"
+    err "Actual:   $actual"
+    return 1
+  fi
+  chmod 0700 "$destination"
+}
 
 pause() {
   printf '\n==> %s\n    Press ENTER to continue.\n' "$1"
@@ -36,16 +64,17 @@ load_brew_env() {
   fi
 }
 
-# Use sudo if not already root. On Linux running as root, SUDO is empty.
-SUDO=""
-[[ "${EUID:-$(id -u)}" -ne 0 ]] && SUDO="sudo"
+# Use sudo if not already root. An array avoids accidental word splitting or
+# command injection if this is extended with arguments later.
+SUDO=()
+[[ "${EUID:-$(id -u)}" -ne 0 ]] && SUDO=(sudo)
 
-apt_install() { $SUDO apt-get install -y --no-install-recommends "$@"; }
+apt_install() { "${SUDO[@]}" apt-get install -y --no-install-recommends "$@"; }
 
 log "rmferrer/env_bootstrap setup.sh"
 info "OS:           $OS"
 info "Arch:         $ARCH"
-info "User:         $USER  (UID $(id -u))"
+info "User:         $CURRENT_USER  (UID $(id -u))"
 info "Home:         $HOME"
 info "Clone target: $TARGET"
 info "Date:         $(date)"
@@ -65,9 +94,15 @@ case "$OS" in
       skip "brew already installed at $(command -v brew)"
       info "Version: $(brew --version | head -1)"
     else
-      info "Installing Homebrew (downloads + compiles, can take 5+ min)"
-      NONINTERACTIVE=1 /bin/bash -c \
-        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      info "Installing Homebrew from reviewed installer revision (can take 5+ min)"
+      installer_dir="$(mktemp -d "${TMPDIR:-/tmp}/env-bootstrap.XXXXXX")"
+      chmod 0700 "$installer_dir"
+      trap 'rm -rf "$installer_dir"' EXIT
+      download_verified "$HOMEBREW_INSTALL_URL" "$HOMEBREW_INSTALL_SHA256" \
+        "$installer_dir/homebrew-install.sh"
+      NONINTERACTIVE=1 /bin/bash "$installer_dir/homebrew-install.sh"
+      rm -rf "$installer_dir"
+      trap - EXIT
       ok "Homebrew installed"
     fi
     load_brew_env
@@ -142,14 +177,15 @@ case "$OS" in
   # ─── Linux ────────────────────────────────────────────────────────────────
   Linux)
     if ! command -v apt-get &>/dev/null; then
+      distro="$(awk -F= '$1 == "ID" { gsub(/^\"|\"$/, "", $2); print $2 }' /etc/os-release 2>/dev/null || true)"
       err "Only Debian/Ubuntu (apt-get) is currently supported on Linux."
-      err "Add support for $(. /etc/os-release && echo "$ID") if you need it."
+      err "Add support for ${distro:-this distribution} if you need it."
       exit 1
     fi
 
     log "[1/2] Distro packages (git, curl, ca-certificates)"
     info "Refreshing apt index..."
-    $SUDO apt-get update -qq
+    "${SUDO[@]}" apt-get update -qq
     apt_install git curl ca-certificates
     ok "Distro packages installed"
 
@@ -179,6 +215,12 @@ esac
 # ── Step 4: Clone private repo (and pull latest if it already exists) ────────
 log "Clone or update private environment repo"
 if [[ -d "$TARGET/.git" ]]; then
+  origin_url="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
+  if [[ "$origin_url" != "$PRIVATE_REPO" && "$origin_url" != "$PRIVATE_REPO_HTTPS" ]]; then
+    err "$TARGET has an unexpected origin: ${origin_url:-<missing>}"
+    err "Expected $PRIVATE_REPO (or its HTTPS equivalent). Refusing to execute it."
+    exit 1
+  fi
   info "Existing repo at $TARGET — pulling latest..."
   info "HEAD before: $(git -C "$TARGET" log -1 --oneline 2>&1)"
   git -C "$TARGET" pull --ff-only
@@ -191,6 +233,16 @@ else
   mkdir -p "$(dirname "$TARGET")"
   git clone "$PRIVATE_REPO" "$TARGET"
   ok "Clone complete: $(git -C "$TARGET" log -1 --oneline)"
+fi
+
+# A local modification to the handoff script must never be executed implicitly
+# by this remote bootstrap. Other dotfile edits may legitimately be dirty.
+expected_bootstrap="$(git -C "$TARGET" rev-parse HEAD:bootstrap.sh 2>/dev/null || true)"
+actual_bootstrap="$(git -C "$TARGET" hash-object "$TARGET/bootstrap.sh" 2>/dev/null || true)"
+if [[ -z "$expected_bootstrap" || "$actual_bootstrap" != "$expected_bootstrap" ]]; then
+  err "$TARGET/bootstrap.sh does not match the committed HEAD version."
+  err "Review or discard that local change before re-running setup."
+  exit 1
 fi
 
 log "Handoff to private bootstrap.sh"
