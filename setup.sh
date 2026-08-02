@@ -177,8 +177,9 @@ case "$OS" in
   # ─── Linux ────────────────────────────────────────────────────────────────
   Linux)
     if ! command -v apt-get &>/dev/null; then
+      distro="$(awk -F= '$1 == "ID" { gsub(/^\"|\"$/, "", $2); print $2 }' /etc/os-release 2>/dev/null || true)"
       err "Only Debian/Ubuntu (apt-get) is currently supported on Linux."
-      err "Add support for $(. /etc/os-release && echo "$ID") if you need it."
+      err "Add support for ${distro:-this distribution} if you need it."
       exit 1
     fi
 

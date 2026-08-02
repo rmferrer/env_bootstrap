@@ -30,8 +30,8 @@ tmp="$(mktemp "${TMPDIR:-/tmp}/env-bootstrap.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
   --output "$tmp" \
-  https://raw.githubusercontent.com/rmferrer/env_bootstrap/daf41a6e8cc0229c8d89719292afc50ff838d108/setup.sh
-expected=3b72b2559d73f235e6c0d31dac3439fa475a2e267a08605e2b1a437694211075
+  https://raw.githubusercontent.com/rmferrer/env_bootstrap/master/setup.sh
+expected=fd03aabeb9e0ec961599768ac33e1e6c93b588c73b4da1ea2c9098b39e6cc82a
 if command -v sha256sum >/dev/null 2>&1; then
   actual="$(sha256sum "$tmp" | awk '{print $1}')"
 else
@@ -64,5 +64,6 @@ The script branches on what it finds:
   private clone. A compromised remote host can use a forwarded agent while the
   SSH connection is alive, so only bootstrap trusted devboxes and disconnect
   when setup is complete.
-- The pinned setup revision and digest must be updated together after reviewing
-  future bootstrap changes.
+- The setup content and digest must be updated together after reviewing future
+  bootstrap changes. A changed `master` fails closed until the documented
+  digest is deliberately updated.
