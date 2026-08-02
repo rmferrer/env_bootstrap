@@ -22,11 +22,26 @@ its `bootstrap.sh` for chezmoi.
 
 ## Run it
 
-```sh
-/bin/bash -c "$(curl -fsSL https://bit.ly/rmferrer_env_bootstrap)"
+Download the reviewed revision, verify its SHA-256 digest, and only then run
+it. This deliberately avoids executing a mutable branch or URL shortener.
+
+```bash
+tmp="$(mktemp "${TMPDIR:-/tmp}/env-bootstrap.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+  --output "$tmp" \
+  https://raw.githubusercontent.com/rmferrer/env_bootstrap/daf41a6e8cc0229c8d89719292afc50ff838d108/setup.sh
+expected=3b72b2559d73f235e6c0d31dac3439fa475a2e267a08605e2b1a437694211075
+if command -v sha256sum >/dev/null 2>&1; then
+  actual="$(sha256sum "$tmp" | awk '{print $1}')"
+else
+  actual="$(shasum -a 256 "$tmp" | awk '{print $1}')"
+fi
+[ "$actual" = "$expected" ] || { echo "bootstrap checksum mismatch" >&2; exit 1; }
+/bin/bash "$tmp"
 ```
 
-That's the only command. The script branches on what it finds:
+The script branches on what it finds:
 
 - **macOS, regular user**: installs Homebrew + 1Password app/CLI, pauses for
   you to enable SSH agent + CLI integration, clones the private repo, runs
@@ -37,3 +52,17 @@ That's the only command. The script branches on what it finds:
   work profile?" and "Enable the personal profile?" — answer `true`/`false`
   per machine (devboxes: work `true`, personal `false`).
 - **macOS, root**: refuses. Log in as your regular account.
+
+## Security model
+
+- The bootstrap verifies the reviewed Homebrew installer entrypoint before
+  executing it. Package payload verification remains the responsibility of
+  Homebrew and the platform package managers.
+- An existing `~/code/env` checkout must point at the expected GitHub repo, and
+  its `bootstrap.sh` must match the committed `HEAD` version before handoff.
+- Linux setup uses a forwarded SSH agent only long enough to authenticate the
+  private clone. A compromised remote host can use a forwarded agent while the
+  SSH connection is alive, so only bootstrap trusted devboxes and disconnect
+  when setup is complete.
+- The pinned setup revision and digest must be updated together after reviewing
+  future bootstrap changes.
